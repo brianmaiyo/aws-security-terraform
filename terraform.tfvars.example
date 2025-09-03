@@ -1,0 +1,16 @@
+# AWS Configuration
+aws_region   = "us-east-1"
+environment  = "production"
+project_name = "security-services"
+
+# GuardDuty Configuration
+guardduty_findings_s3_bucket_name = "my-company-guardduty-findings"
+
+# GuardDuty Protection Features
+enable_guardduty_s3_protection       = true
+enable_guardduty_eks_protection      = true
+enable_guardduty_runtime_monitoring  = true
+enable_guardduty_malware_protection  = true
+enable_guardduty_rds_protection      = true
+enable_guardduty_lambda_protection   = true
+retain_malware_snapshots            = true
