@@ -30,21 +30,23 @@ output "security_hub_account_id" {
   value       = aws_securityhub_account.main.id
 }
 
-output "security_hub_standards" {
-  description = "List of enabled Security Hub standards"
-  value = {
-    aws_foundational = aws_securityhub_standards_subscription.aws_foundational.standards_arn
-    nist_800_53      = aws_securityhub_standards_subscription.nist_800_53.standards_arn
-    cis_foundations  = aws_securityhub_standards_subscription.cis_aws_foundations.standards_arn
-  }
-}
+# Security Hub standards are commented out due to region-specific ARN issues
+# output "security_hub_standards" {
+#   description = "List of enabled Security Hub standards"
+#   value = {
+#     aws_foundational = aws_securityhub_standards_subscription.aws_foundational.standards_arn
+#     nist_800_53      = aws_securityhub_standards_subscription.nist_800_53.standards_arn
+#     cis_foundations  = aws_securityhub_standards_subscription.cis_aws_foundations.standards_arn
+#   }
+# }
 
 # Inspector Outputs
 output "inspector_enablers" {
   description = "Inspector enabler resource types"
   value = {
-    ec2    = aws_inspector2_enabler.ec2.resource_types
-    ecr    = aws_inspector2_enabler.ecr.resource_types
-    lambda = aws_inspector2_enabler.lambda.resource_types
+    ec2 = aws_inspector2_enabler.ec2.resource_types
+    # ecr and lambda enablers commented out due to timeout issues
+    # ecr    = aws_inspector2_enabler.ecr.resource_types
+    # lambda = aws_inspector2_enabler.lambda.resource_types
   }
 }

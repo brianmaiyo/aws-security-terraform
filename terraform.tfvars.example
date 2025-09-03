@@ -1,10 +1,10 @@
 # AWS Configuration
-aws_region   = "us-east-1"
+aws_region   = "eu-west-1"
 environment  = "production"
 project_name = "security-services"
 
 # GuardDuty Configuration
-guardduty_findings_s3_bucket_name = "my-company-guardduty-findings"
+guardduty_findings_s3_bucket_name = "my-company-guardduty-findings-eu-west-1"
 
 # GuardDuty Protection Features
 enable_guardduty_s3_protection       = true

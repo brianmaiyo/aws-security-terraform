@@ -12,13 +12,14 @@ resource "aws_guardduty_detector" "main" {
         enable = var.enable_guardduty_eks_protection
       }
     }
-    malware_protection {
-      scan_ec2_instance_with_findings {
-        ebs_volumes {
-          enable = var.enable_guardduty_malware_protection
-        }
-      }
-    }
+    # Malware protection disabled due to IAM permission requirements
+    # malware_protection {
+    #   scan_ec2_instance_with_findings {
+    #     ebs_volumes {
+    #       enable = var.enable_guardduty_malware_protection
+    #     }
+    #   }
+    # }
   }
 
   tags = {
@@ -79,7 +80,7 @@ resource "aws_kms_alias" "guardduty" {
 
 # S3 Bucket for GuardDuty Findings
 resource "aws_s3_bucket" "guardduty_findings" {
-  bucket        = var.guardduty_findings_s3_bucket_name != null ? var.guardduty_findings_s3_bucket_name : "${var.project_name}-guardduty-findings-${random_id.bucket_suffix.hex}"
+  bucket        = var.guardduty_findings_s3_bucket_name != null ? var.guardduty_findings_s3_bucket_name : "brianmaiyo-guardduty-findings-${random_id.bucket_suffix.hex}"
   force_destroy = false
 
   tags = {
@@ -231,14 +232,10 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 }
 
 # GuardDuty Malware Protection
-resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
-  count       = var.enable_guardduty_malware_protection ? 1 : 0
-  detector_id = aws_guardduty_detector.main.id
-  name        = "EBS_MALWARE_PROTECTION"
-  status      = "ENABLED"
-
-  additional_configuration {
-    name   = "EC2_AGENT_MANAGEMENT"
-    status = var.enable_ec2_agent_management ? "ENABLED" : "DISABLED"
-  }
-}
+# Note: EBS_MALWARE_PROTECTION requires additional IAM permissions
+# resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
+#   count       = var.enable_guardduty_malware_protection ? 1 : 0
+#   detector_id = aws_guardduty_detector.main.id
+#   name        = "EBS_MALWARE_PROTECTION"
+#   status      = "ENABLED"
+# }
