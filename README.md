@@ -1,159 +1,83 @@
 # AWS Security Services Terraform Configuration
 
-This Terraform configuration sets up comprehensive AWS security services including GuardDuty, Security Hub, and Inspector with all the specified requirements.
+Simple Terraform configuration that sets up AWS security monitoring with GuardDuty, Security Hub, and Inspector.
 
-## Features
+## What This Deploys
 
-### Amazon GuardDuty
-- ✅ Enable and Configure GuardDuty
-- ✅ Export Findings to S3 Bucket with KMS Key
-- ✅ GuardDuty KMS Key with proper policies
-- ✅ S3 Bucket with GuardDuty-specific bucket policy
-- ✅ S3 Protection
-- ✅ EKS Protection
-- ✅ Runtime Monitoring (EKS, Fargate, EC2)
-- ✅ Malware Protection for EC2 (with snapshot retention)
-- ✅ RDS Protection
-- ✅ Lambda Protection
-
-### AWS Security Hub
-- ✅ Enable Security Hub
-- ✅ AWS Foundational Security Best Practices v1.0.0
-- ✅ NIST Special Publication 800-53 Revision 5
-- ✅ CIS AWS Foundations Benchmark v1.4.0
-- ✅ GuardDuty integration
-- ✅ Inspector integration
-
-### Amazon Inspector
-- ✅ Enable Inspector V2
-- ✅ Amazon EC2 scanning (Hybrid mode)
-- ✅ Amazon ECR scanning
-- ✅ AWS Lambda scanning
+- **GuardDuty**: Threat detection for your AWS account with all protection features enabled
+- **Security Hub**: Central security dashboard with AWS Foundational and CIS standards
+- **Inspector**: Vulnerability scanning for EC2, ECR, and Lambda (Lambda disabled in EU regions)
+- **S3 Bucket**: Encrypted storage for GuardDuty findings with lifecycle management
+- **KMS Key**: Dedicated encryption key for GuardDuty findings
 
 ## Prerequisites
 
-1. AWS CLI configured with appropriate permissions
+1. AWS CLI configured with admin permissions
 2. Terraform >= 1.0 installed
-3. Appropriate IAM permissions for:
-   - GuardDuty management
-   - Security Hub management
-   - Inspector management
-   - S3 bucket creation and management
-   - KMS key creation and management
 
-## Required IAM Permissions
+## Quick Start
 
-Your AWS credentials need the following permissions:
-- `guardduty:*`
-- `securityhub:*`
-- `inspector2:*`
-- `s3:*`
-- `kms:*`
-- `iam:GetRole`
-- `iam:PassRole`
-
-## Deployment Instructions
-
-1. **Clone and Navigate**
+1. **Configure**
    ```bash
-   # Navigate to the terraform directory
-   cd /path/to/terraform/files
-   ```
-
-2. **Configure Variables**
-   ```bash
-   # Copy the example variables file
    cp terraform.tfvars.example terraform.tfvars
-   
-   # Edit the variables to match your requirements
-   # Especially update the S3 bucket name to be globally unique
+   # Edit terraform.tfvars - change the S3 bucket name to be globally unique
    ```
 
-3. **Initialize Terraform**
+2. **Deploy**
    ```bash
    terraform init
-   ```
-
-4. **Plan the Deployment**
-   ```bash
-   terraform plan
-   ```
-
-5. **Apply the Configuration**
-   ```bash
    terraform apply
    ```
 
-6. **Verify Deployment**
-   - Check GuardDuty console for enabled detector and protections
-   - Check Security Hub console for enabled standards
-   - Check Inspector console for enabled scanning
+That's it! Your AWS security monitoring is now active.
 
 ## Configuration Options
 
-### GuardDuty S3 Bucket Naming
-- If `guardduty_findings_s3_bucket_name` is not specified, a random suffix will be added
-- Ensure the bucket name is globally unique
+### Configuration
 
-### Protection Features
-All GuardDuty protection features can be enabled/disabled via variables:
-- `enable_guardduty_s3_protection`
-- `enable_guardduty_eks_protection`
-- `enable_guardduty_runtime_monitoring`
-- `enable_guardduty_malware_protection`
-- `enable_guardduty_rds_protection`
-- `enable_guardduty_lambda_protection`
+Only 4 variables to configure:
 
-### Agent Management
-- Set `enable_ec2_agent_management = true` to automatically manage GuardDuty agents on EC2 instances
-- This enables automatic deployment and management of security agents for runtime monitoring and malware protection
+```hcl
+aws_region   = "us-east-1"                              # Your AWS region
+project_name = "my-company-security"                    # For resource naming
+guardduty_findings_s3_bucket_name = "my-unique-bucket" # Must be globally unique
+enable_security_hub = true                             # Enable Security Hub
+```
 
-### Malware Snapshot Retention
-- Set `retain_malware_snapshots = true` to keep snapshots when malware is detected
-- Set to `false` to automatically delete snapshots after scanning
+## Regional Notes
 
-## Important Notes
+- **EU Regions**: Inspector Lambda scanning is automatically disabled due to timeout issues
+- **All Regions**: GuardDuty and Security Hub work everywhere
+- **S3 Bucket**: Must have a globally unique name
 
-1. **Regional Deployment**: This configuration deploys services in a single region. For multi-region setup, deploy in each required region.
+## What Gets Created
 
-2. **Cost Considerations**: 
-   - GuardDuty charges are based on data processed
-   - Inspector charges are based on assessments run
-   - Security Hub has a per-finding charge model
-
-3. **Organizations**: If using AWS Organizations, consider enabling these services at the organization level for centralized management.
-
-4. **Existing GuardDuty**: If GuardDuty is already enabled, you may need to import the existing detector:
-   ```bash
-   terraform import aws_guardduty_detector.main <detector-id>
-   ```
+- GuardDuty detector with all protection features enabled
+- S3 bucket for findings (encrypted with KMS)
+- KMS key for encryption
+- Security Hub with AWS Foundational and CIS standards
+- Inspector scanning for EC2, ECR, and Lambda (where supported)
+- All necessary IAM roles (created automatically by AWS)
 
 ## Troubleshooting
 
-### Common Issues
+**S3 Bucket Already Exists**: Change the bucket name in `terraform.tfvars` to something globally unique.
 
-1. **S3 Bucket Already Exists**: Ensure the bucket name is globally unique
-2. **Insufficient Permissions**: Verify IAM permissions listed above
-3. **Region Availability**: Ensure all services are available in your target region
+**Permission Errors**: Make sure your AWS credentials have admin permissions.
 
-### Validation Commands
+**EU Regions**: Inspector Lambda scanning is automatically disabled - this is normal.
 
-```bash
-# Check GuardDuty status
-aws guardduty list-detectors
+## Verification
 
-# Check Security Hub status
-aws securityhub get-enabled-standards
-
-# Check Inspector status
-aws inspector2 batch-get-account-status
-```
+After deployment, check the AWS console:
+- GuardDuty: Should show enabled detector
+- Security Hub: Should show enabled standards  
+- Inspector: Should show enabled scanning
 
 ## Cleanup
 
-To destroy all resources:
 ```bash
 terraform destroy
 ```
 
-**Warning**: This will delete all security configurations and the S3 bucket with findings data.
+This will remove all security services and the S3 bucket with findings.

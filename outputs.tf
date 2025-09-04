@@ -1,52 +1,42 @@
-# GuardDuty Outputs
-output "guardduty_detector_id" {
-  description = "The ID of the GuardDuty detector"
-  value       = aws_guardduty_detector.main.id
+# Deployment status and regional capabilities
+output "deployment_summary" {
+  description = "Summary of deployed services and regional capabilities"
+  value = local.deployment_summary
 }
 
-output "guardduty_kms_key_id" {
-  description = "The ID of the GuardDuty KMS key"
-  value       = aws_kms_key.guardduty.key_id
+output "regional_capabilities" {
+  description = "Current region's service capabilities"
+  value = local.current_region_capabilities
 }
 
-output "guardduty_kms_key_arn" {
-  description = "The ARN of the GuardDuty KMS key"
-  value       = aws_kms_key.guardduty.arn
+output "guardduty_features" {
+  description = "GuardDuty features enabled in this deployment"
+  value = local.guardduty_features
 }
 
-output "guardduty_s3_bucket_name" {
-  description = "The name of the S3 bucket for GuardDuty findings"
-  value       = aws_s3_bucket.guardduty_findings.bucket
+output "inspector_services" {
+  description = "Inspector services enabled in this deployment"  
+  value = local.inspector_services
 }
 
-output "guardduty_s3_bucket_arn" {
-  description = "The ARN of the S3 bucket for GuardDuty findings"
-  value       = aws_s3_bucket.guardduty_findings.arn
-}
-
-# Security Hub Outputs
-output "security_hub_account_id" {
-  description = "The AWS account ID associated with Security Hub"
-  value       = aws_securityhub_account.main.id
-}
-
-# Security Hub standards are commented out due to region-specific ARN issues
-# output "security_hub_standards" {
-#   description = "List of enabled Security Hub standards"
-#   value = {
-#     aws_foundational = aws_securityhub_standards_subscription.aws_foundational.standards_arn
-#     nist_800_53      = aws_securityhub_standards_subscription.nist_800_53.standards_arn
-#     cis_foundations  = aws_securityhub_standards_subscription.cis_aws_foundations.standards_arn
-#   }
-# }
-
-# Inspector Outputs
-output "inspector_enablers" {
-  description = "Inspector enabler resource types"
+output "security_services_status" {
+  description = "Status of all security services"
   value = {
-    ec2 = aws_inspector2_enabler.ec2.resource_types
-    # ecr and lambda enablers commented out due to timeout issues
-    # ecr    = aws_inspector2_enabler.ecr.resource_types
-    # lambda = aws_inspector2_enabler.lambda.resource_types
+    guardduty = {
+      detector_id = aws_guardduty_detector.main.id
+      s3_bucket = aws_s3_bucket.guardduty_findings.bucket
+      kms_key = aws_kms_key.guardduty.arn
+    }
+    security_hub = {
+      enabled = var.enable_security_hub
+      account_id = var.enable_security_hub ? aws_securityhub_account.main[0].id : null
+      standards_disabled_reason = "ARN format issues in current region"
+    }
+    inspector = {
+      ec2_enabled = local.inspector_services.enable_ec2
+      ecr_enabled = local.inspector_services.enable_ecr  
+      lambda_enabled = local.inspector_services.enable_lambda
+      disabled_reason = local.deployment_summary.regional_limitations.has_inspector_timeouts ? "Timeout issues in EU regions" : null
+    }
   }
 }

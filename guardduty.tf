@@ -1,34 +1,35 @@
-# GuardDuty Detector
 resource "aws_guardduty_detector" "main" {
   enable                       = true
   finding_publishing_frequency = "FIFTEEN_MINUTES"
 
   datasources {
     s3_logs {
-      enable = var.enable_guardduty_s3_protection
+      enable = true
     }
     kubernetes {
       audit_logs {
-        enable = var.enable_guardduty_eks_protection
+        enable = true
       }
     }
-    # Malware protection disabled due to IAM permission requirements
-    # malware_protection {
-    #   scan_ec2_instance_with_findings {
-    #     ebs_volumes {
-    #       enable = var.enable_guardduty_malware_protection
-    #     }
-    #   }
-    # }
+    # malware_protection - conditionally enabled based on regional capabilities
+    dynamic "malware_protection" {
+      for_each = local.guardduty_features.enable_malware_protection ? [1] : []
+      content {
+        scan_ec2_instance_with_findings {
+          ebs_volumes {
+            enable = true
+          }
+        }
+      }
+    }
   }
 
   tags = {
-    Name        = "${var.project_name}-guardduty-detector"
-    Environment = var.environment
+    Name = "${var.project_name}-guardduty"
   }
 }
 
-# GuardDuty KMS Key
+# KMS Key for GuardDuty
 resource "aws_kms_key" "guardduty" {
   description             = "KMS key for GuardDuty findings encryption"
   deletion_window_in_days = 7
@@ -68,8 +69,7 @@ resource "aws_kms_key" "guardduty" {
   })
 
   tags = {
-    Name        = "${var.project_name}-guardduty-kms-key"
-    Environment = var.environment
+    Name = "${var.project_name}-guardduty-kms"
   }
 }
 
@@ -80,12 +80,10 @@ resource "aws_kms_alias" "guardduty" {
 
 # S3 Bucket for GuardDuty Findings
 resource "aws_s3_bucket" "guardduty_findings" {
-  bucket        = var.guardduty_findings_s3_bucket_name != null ? var.guardduty_findings_s3_bucket_name : "brianmaiyo-guardduty-findings-${random_id.bucket_suffix.hex}"
-  force_destroy = false
+  bucket = var.guardduty_findings_s3_bucket_name != null ? var.guardduty_findings_s3_bucket_name : "${var.project_name}-guardduty-findings-${random_id.bucket_suffix.hex}"
 
   tags = {
-    Name        = "${var.project_name}-guardduty-findings"
-    Environment = var.environment
+    Name = "${var.project_name}-guardduty-findings"
   }
 }
 
@@ -178,6 +176,42 @@ resource "aws_s3_bucket_policy" "guardduty_findings" {
   })
 }
 
+# S3 Bucket Lifecycle Configuration
+resource "aws_s3_bucket_lifecycle_configuration" "guardduty_findings" {
+  bucket = aws_s3_bucket.guardduty_findings.id
+
+  rule {
+    id     = "guardduty_findings_retention"
+    status = "Enabled"
+
+    filter {}
+
+    # Keep findings for 1 year
+    expiration {
+      days = 365
+    }
+
+    # Transition to IA after 30 days
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    # Transition to Glacier after 90 days
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    # Delete incomplete multipart uploads after 7 days
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.guardduty_findings]
+}
+
 # GuardDuty Publishing Destination
 resource "aws_guardduty_publishing_destination" "main" {
   detector_id     = aws_guardduty_detector.main.id
@@ -185,29 +219,25 @@ resource "aws_guardduty_publishing_destination" "main" {
   kms_key_arn     = aws_kms_key.guardduty.arn
 
   depends_on = [
-    aws_s3_bucket_policy.guardduty_findings
+    aws_s3_bucket_policy.guardduty_findings,
+    aws_s3_bucket_server_side_encryption_configuration.guardduty_findings,
+    aws_s3_bucket_public_access_block.guardduty_findings
   ]
 }
 
-# GuardDuty RDS Protection
 resource "aws_guardduty_detector_feature" "rds_login_events" {
-  count       = var.enable_guardduty_rds_protection ? 1 : 0
   detector_id = aws_guardduty_detector.main.id
   name        = "RDS_LOGIN_EVENTS"
   status      = "ENABLED"
 }
 
-# GuardDuty Lambda Protection
 resource "aws_guardduty_detector_feature" "lambda_network_logs" {
-  count       = var.enable_guardduty_lambda_protection ? 1 : 0
   detector_id = aws_guardduty_detector.main.id
   name        = "LAMBDA_NETWORK_LOGS"
   status      = "ENABLED"
 }
 
-# GuardDuty EKS Runtime Monitoring
 resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
-  count       = var.enable_guardduty_runtime_monitoring ? 1 : 0
   detector_id = aws_guardduty_detector.main.id
   name        = "EKS_RUNTIME_MONITORING"
   status      = "ENABLED"
@@ -218,24 +248,22 @@ resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
   }
 }
 
-# GuardDuty EC2 Runtime Monitoring
 resource "aws_guardduty_detector_feature" "runtime_monitoring" {
-  count       = var.enable_guardduty_runtime_monitoring ? 1 : 0
   detector_id = aws_guardduty_detector.main.id
   name        = "RUNTIME_MONITORING"
   status      = "ENABLED"
 
   additional_configuration {
     name   = "EC2_AGENT_MANAGEMENT"
-    status = var.enable_ec2_agent_management ? "ENABLED" : "DISABLED"
+    status = "ENABLED"
   }
 }
 
-# GuardDuty Malware Protection
-# Note: EBS_MALWARE_PROTECTION requires additional IAM permissions
-# resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
-#   count       = var.enable_guardduty_malware_protection ? 1 : 0
-#   detector_id = aws_guardduty_detector.main.id
-#   name        = "EBS_MALWARE_PROTECTION"
-#   status      = "ENABLED"
-# }
+# EBS Malware Protection - conditionally enabled based on regional capabilities
+resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
+  count = local.guardduty_features.enable_malware_protection ? 1 : 0
+  
+  detector_id = aws_guardduty_detector.main.id
+  name        = "EBS_MALWARE_PROTECTION"
+  status      = "ENABLED"
+}
